@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>VOXEL Universal Code AI v6</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: monospace;
+    background: #050505;
+    color: #00ff88;
+}
+
+header {
+    padding: 18px;
+    text-align: center;
+    border-bottom: 2px solid #00ff88;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+}
+
+textarea {
+    width: 100%;
+    height: 160px;
+    background: #111;
+    color: #fff;
+    border: 1px solid #00ff88;
+    padding: 10px;
+}
+
+button {
+    margin-top: 10px;
+    padding: 10px 15px;
+    background: #00ff88;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.card {
+    margin-top: 20px;
+    background: #111;
+    padding: 15px;
+    border-left: 4px solid #00ff88;
+    white-space: pre-wrap;
+}
+
+/* POPUP */
+.popup {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.85);
+    justify-content: center;
+    align-items: center;
+}
+
+.popup-content {
+    background: #111;
+    border: 2px solid red;
+    padding: 20px;
+    text-align: center;
+    color: red;
+}
+
+.popup-content button {
+    background: red;
+    color: white;
+    margin-top: 10px;
+}
+</style>
+
+</head>
+<body>
+
+<header>
+<h1>🤖 VOXEL UNIVERSAL CODE AI v6</h1>
+<p>Final Smart Decoder + Morse Audio</p>
+</header>
+
+<div class="container">
+
+<textarea id="input" placeholder="Masukkan kode apapun... Morse / Binary / Hex / Base64"></textarea>
+
+<br>
+
+<button onclick="runAI()">Analisis</button>
+<button onclick="resetAll()">Reset</button>
+
+<button id="copyBtn" onclick="copyAll()" style="display:none;">
+📋 Copy Semua Hasil
+</button>
+
+<!-- 🔊 MORSE AUDIO BUTTON -->
+<button onclick="playMorse()">🔊 Play Morse Audio</button>
+
+<div id="output"></div>
+
+</div>
+
+<!-- POPUP -->
+<div class="popup" id="popup">
+    <div class="popup-content">
+        <h3>⚠ KODE TIDAK DITEMUKAN</h3>
+        <p>AI tidak bisa memproses input ini.</p>
+        <button onclick="closePopup()">TUTUP</button>
+    </div>
+</div>
+
+<script>
+
+/* ======================
+   MORSE MAP
+====================== */
+const morseMap = {
+".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E",
+"..-.":"F","--.":"G","....":"H","..":"I",".---":"J",
+"-.-":"K",".-..":"L","--":"M","-.":"N","---":"O",
+".--.":"P","--.-":"Q",".-.":"R","...":"S","-":"T",
+"..-":"U","...-":"V",".--":"W","-..-":"X","-.--":"Y","--..":"Z"
+};
+
+let lastResult = "";
+
+/* ======================
+   MORSE DECODER (/ FIX)
+====================== */
+function decodeMorse(str){
+
+return str
+.replace(/\|/g," / ")
+.replace(/\s*\/\s*/g," / ")
+.trim()
+.split(" / ")
+.map(word =>
+word.split(" ")
+.map(c => morseMap[c] || "")
+.join("")
+)
+.join(" ");
+}
+
+/* ======================
+   DECODERS
+====================== */
+function decodeBinary(str){
+return str.split(" ")
+.map(b=>String.fromCharCode(parseInt(b,2)))
+.join("");
+}
+
+function decodeHex(str){
+return str.replace(/0x/g,"")
+.split(" ")
+.map(h=>String.fromCharCode(parseInt(h,16)))
+.join("");
+}
+
+function decodeBase64(str){
+try { return atob(str); }
+catch { return null; }
+}
+
+function decodeURL(str){
+try { return decodeURIComponent(str); }
+catch { return null; }
+}
+
+/* ======================
+   CONVERTER
+====================== */
+function toBinary(text){
+return text.split("")
+.map(c=>c.charCodeAt(0).toString(2))
+.join(" ");
+}
+
+function encrypt(text){
+let out="";
+for(let i=0;i<text.length;i++){
+out += (text.charCodeAt(i)*9+11).toString(16);
+}
+return out.toUpperCase();
+}
+
+/* ======================
+   DETECTOR
+====================== */
+function detectType(input){
+if(/^[.\-\s\/\|]+$/.test(input)) return "MORSE";
+if(/^[01\s]+$/.test(input)) return "BINARY";
+if(/^0x[0-9a-fA-F\s]+$/.test(input)) return "HEX";
+if(/^[A-Za-z0-9+/=]+$/.test(input)) return "BASE64";
+if(input.includes("%")) return "URL";
+return "TEXT";
+}
+
+/* ======================
+   SMART GUESS
+====================== */
+function smartGuess(input){
+let cleaned = input.replace(/[^.\-0-9a-zA-Z+/=%\s\/]/g,"").trim();
+
+if(cleaned.includes(".") || cleaned.includes("-")){
+return decodeMorse(cleaned);
+}
+
+if(/[01]{4,}/.test(cleaned)){
+try { return decodeBinary(cleaned); } catch {}
+}
+
+return cleaned || null;
+}
+
+/* ======================
+   POPUP
+====================== */
+function showPopup(){
+document.getElementById("popup").style.display = "flex";
+document.getElementById("copyBtn").style.display = "none";
+}
+
+function closePopup(){
+document.getElementById("popup").style.display = "none";
+}
+
+/* ======================
+   RESET
+====================== */
+function resetAll(){
+document.getElementById("input").value = "";
+document.getElementById("output").innerHTML = "";
+document.getElementById("copyBtn").style.display = "none";
+lastResult = "";
+}
+
+/* ======================
+   COPY
+====================== */
+function copyAll(){
+if(!lastResult){
+showPopup();
+return;
+}
+navigator.clipboard.writeText(lastResult);
+alert("📋 Semua hasil berhasil di-copy!");
+}
+
+/* ======================
+   MAIN AI
+====================== */
+function runAI(){
+
+let input = document.getElementById("input").value.trim();
+let out = document.getElementById("output");
+
+if(input === ""){
+showPopup();
+return;
+}
+
+let type = detectType(input);
+let decoded = input;
+
+if(type==="MORSE") decoded = decodeMorse(input);
+if(type==="BINARY") decoded = decodeBinary(input);
+if(type==="HEX") decoded = decodeHex(input);
+if(type==="BASE64") decoded = decodeBase64(input);
+if(type==="URL") decoded = decodeURL(input);
+
+if(!decoded || decoded.includes("null") || decoded.includes("?")){
+decoded = smartGuess(input);
+if(!decoded){
+showPopup();
+return;
+}
+type = "SMART_GUESS";
+}
+
+let result = "";
+
+result += "🧠 DETEKSI: " + type + "\n\n";
+result += "🔓 HASIL DECODE:\n" + decoded + "\n\n";
+
+result += "🔁 SYSTEM CONVERT:\n";
+result += "BINARY:\n" + toBinary(decoded) + "\n\n";
+
+result += "HEX ENCRYPT:\n" + encrypt(decoded) + "\n\n";
+
+result += "VM CORE:\n0x" + encrypt(decoded).split("").reverse().join("") + "_CORE";
+
+lastResult = result;
+
+out.innerHTML = `<div class="card">${result}</div>`;
+document.getElementById("copyBtn").style.display = "inline-block";
+}
+
+/* ======================
+   🔊 MORSE AUDIO ENGINE
+====================== */
+let audioCtx;
+
+function beep(duration, freq = 600){
+if(!audioCtx){
+audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+let osc = audioCtx.createOscillator();
+let gain = audioCtx.createGain();
+
+osc.frequency.value = freq;
+osc.type = "square";
+
+osc.connect(gain);
+gain.connect(audioCtx.destination);
+
+osc.start();
+
+setTimeout(()=>{
+osc.stop();
+}, duration);
+}
+
+function playMorse(){
+
+let input = document.getElementById("input").value.trim();
+
+if(!input){
+showPopup();
+return;
+}
+
+let morse = input
+.replace(/\|/g," / ")
+.replace(/\s*\/\s*/g," / ")
+.trim();
+
+let symbols = morse.split("");
+let i = 0;
+
+function next(){
+
+if(i >= symbols.length) return;
+
+let s = symbols[i];
+
+if(s === "."){
+beep(120);
+setTimeout(()=>{ i++; next(); },150);
+}
+else if(s === "-"){
+beep(350);
+setTimeout(()=>{ i++; next(); },400);
+}
+else if(s === "/"){
+setTimeout(()=>{ i++; next(); },600);
+}
+else {
+setTimeout(()=>{ i++; next(); },120);
+}
+
+}
+
+next();
+}
+
+</script>
+
+</body>
+</html>
